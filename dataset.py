@@ -26,12 +26,13 @@ def pad_with(tensor, k, dim):
     new_tensor = []
     for array in tensor:
         if dim == 3:
-            npad = ((k, longest_sequence - len(array)), (0, 0))
+            npad = (0, 0, k, longest_sequence - len(array))
         if dim == 2:
             npad = (k, longest_sequence - len(array))
-        padded_array = np.pad(array, npad)
+        torch_array = torch.tensor(array, device=device)
+        padded_array = torch.nn.functional.pad(torch_array, npad)
         new_tensor.append(padded_array)
-    new_tensor = torch.tensor(new_tensor)
+    new_tensor = torch.nn.utils.rnn.pad_sequence(new_tensor)
     return new_tensor
 
 
@@ -64,8 +65,18 @@ class MelSpectrogramDataset(torch.utils.data.Dataset):
         return len(torch.flatten(self.spectrograms_array, dims=1))
 
 
+# Initialize cuda
+if torch.cuda.is_available():
+    dev = "cuda:0"
+else:
+    dev = "cpu"
+device = torch.device(dev)
+x = torch.randn(1).cuda()
+torch.cuda.synchronize()
+
 start_time = time.time()
 dataset = MelSpectrogramDataset("data/dev.npy", "data/dev_labels.npy", 5, transform=None)
 print(dataset.spectrograms_array.shape)
+print(dataset.spectrograms_array.device)
 print(dataset.label_array.shape)
 print("---%s seconds ---" % (time.time() - start_time))
