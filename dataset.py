@@ -8,8 +8,33 @@ import numpy as np
 import time
 
 
+def main():
+    torch.cuda.empty_cache
+    # Initialize cuda
+    if torch.cuda.is_available():
+        dev = "cuda:0"
+    else:
+        dev = "cpu"
+    device = torch.device(dev)
+    x = torch.randn(1).cuda()
+    torch.cuda.synchronize()
 
-def pad_with(tensor, k, dim):
+    start_time = time.time()
+    dataset = MelSpectrogramDataset("data/dev.npy", "data/dev_labels.npy", 1,
+                                    None, device)
+    # Running quick tests, to be replaced by pytest later
+    # Check shapes and device
+    print(dataset.spectrograms_array.shape)
+    print(dataset.label_array.shape)
+    print(dataset.spectrograms_array.device)
+    # Test the __get_item__ function
+    x = dataset.__get_item__([0])
+    print(x['spectrogram window'][0][1])
+    print(x['spectrogram window'][0][1].shape)
+    print("---%s seconds ---" % (time.time() - start_time))
+
+
+def pad_with(tensor, k, dim, device):
     """Pads 3d tensor with k zeros pre and the len(longest utterance) + k zeros
     Args:
         tensor (np.array): 3d np object array
@@ -26,24 +51,21 @@ def pad_with(tensor, k, dim):
     new_tensor = []
     for array in tensor:
         if dim == 3:
-            npad = (0, 0, k, longest_sequence - len(array))
+            npad = (0, 0, k, longest_sequence - array.shape[0]) 
         if dim == 2:
             npad = (k, longest_sequence - len(array))
         torch_array = torch.tensor(array, device=device)
-        padded_array = torch.nn.functional.pad(torch_array, npad)
+        padded_array = torch.nn.functional.pad(torch_array, npad, mode='constant', value=0)
         new_tensor.append(padded_array)
     new_tensor = torch.nn.utils.rnn.pad_sequence(new_tensor)
-    return new_tensor
+    return new_tensor.transpose(0, 1)
 
 
 # Inherit Dataset from torch.utils.data
 class MelSpectrogramDataset(torch.utils.data.Dataset):
     """Mel Spectrograms dataset."""
-    def __init__(self,
-                 dataset_file: str,
-                 labels_file: str,
-                 hyperp_K: int,
-                 transform=None):
+    def __init__(self, dataset_file: str, labels_file: str, hyperp_K: int,
+                 transform: transforms, device: str):
         """
         Args:
             dataset_file (string): Path to npy file with mel Spectrograms
@@ -52,31 +74,42 @@ class MelSpectrogramDataset(torch.utils.data.Dataset):
             transform (callable, optional): Optional transform to be applied on a sample
         """
         self.hyperp_K = hyperp_K
-        
-        self.spectrograms_array = np.load(dataset_file, allow_pickle=True)  # Load from npy file   
-        self.spectrograms_array = pad_with(self.spectrograms_array, self.hyperp_K, 3)  # Pad with zeros
-        
-        self.label_array = np.load(labels_file, allow_pickle=True)  # Load from npy file
-        self.label_array = pad_with(self.label_array, self.hyperp_K, 2)   # Pad with zeros
-        
+        self.device = device
+        self.spectrograms_array = np.load(
+            dataset_file, allow_pickle=True)  # Load from npy file
+        self.spectrograms_array = pad_with(self.spectrograms_array,
+                                           self.hyperp_K, 3,
+                                           self.device)  # Pad with zeros
+
+        self.label_array = np.load(labels_file,
+                                   allow_pickle=True)  # Load from npy file
+        self.label_array = pad_with(self.label_array, self.hyperp_K, 2,
+                                    self.device)  # Pad with zeros
+
         self.transform = transform
 
     def __len__(self):
-        return len(torch.flatten(self.spectrograms_array, dims=1))
+        """Returns the length of the dataset
+        """
+        return len(torch.flatten(self.label_array))
+
+    def __get_item__(self, idx):
+        """Retrives sample(s) from the dataset
+        Args:
+            idx (int, tensor): Index of sample(s)
+        """
+        # Convert index tensor to a list
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        # Extract example and corresponding label
+        example = self.spectrograms_array[idx]
+        label = self.label_array[idx]
+        sample = {'spectrogram window': example, 'phoneme': label}
+        # Transform sample
+        if self.transform:
+            sample = self.transform(sample)
+        return sample
 
 
-# Initialize cuda
-if torch.cuda.is_available():
-    dev = "cuda:0"
-else:
-    dev = "cpu"
-device = torch.device(dev)
-x = torch.randn(1).cuda()
-torch.cuda.synchronize()
-
-start_time = time.time()
-dataset = MelSpectrogramDataset("data/dev.npy", "data/dev_labels.npy", 5, transform=None)
-print(dataset.spectrograms_array.shape)
-print(dataset.spectrograms_array.device)
-print(dataset.label_array.shape)
-print("---%s seconds ---" % (time.time() - start_time))
+if __name__ == "__main__":
+    main()
