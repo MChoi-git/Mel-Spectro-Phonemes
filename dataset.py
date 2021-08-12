@@ -71,7 +71,7 @@ def pad_with(tensor, k, dim, device):
 class MelSpectrogramDataset(torch.utils.data.Dataset):
     """Mel Spectrograms dataset."""
     def __init__(self, dataset_file: str, labels_file: str, hyperp_K: int,
-                 transform: transforms, device: str):
+                 transform: transforms, device: str, train: bool):
         """
         Args:
             dataset_file (string): Path to npy file with mel Spectrograms
@@ -81,12 +81,14 @@ class MelSpectrogramDataset(torch.utils.data.Dataset):
         """
         self.hyperp_K = hyperp_K
         self.device = device
+        # self.train = train
         self.spectrograms_array = np.load(
             dataset_file, allow_pickle=True)  # Load from npy file
         self.spectrograms_array = pad_with(self.spectrograms_array,
                                            self.hyperp_K, 3,
                                            self.device)  # Pad with zeros
 
+        # if self.train == True:
         self.label_array = np.load(labels_file,
                                    allow_pickle=True)  # Load from npy file
         self.label_array = pad_with(self.label_array, self.hyperp_K, 2,

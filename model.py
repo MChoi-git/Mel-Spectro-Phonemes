@@ -2,22 +2,23 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 MODELS = {}
+
 
 # Register model decorator
 def register(func=None, *, name=None):
     def wrapper(func):
         MODELS[func.__name__ if name is None else name] = func
         return func
+
     if func is None:
         return wrapper
     return wrapper(func)
 
+
 def get_model(name, *args):
     func = MODELS.get(name, None)
     return func(*args) if func is not None else func
-
 
 
 # Define neural net

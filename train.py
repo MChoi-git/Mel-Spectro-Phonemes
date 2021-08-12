@@ -14,7 +14,15 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def prepare_args():
+    """Prepare arguments for main"""
     parser = argparse.ArgumentParser(description='Args for training')
+    """Optional arguments for pre-split train/test files
+    parser.add_argument('--train_file', type=str, default='data/train.npy')
+    parser.add_argument('--test_file', type=str, default='data/test.npy')
+    parser.add_argument('--label_file',
+                        type=str,
+                        default='data/train_labels.npy')
+    """
     parser.add_argument('--dataset_file', type=str, default='data/dev.npy')
     parser.add_argument('--label_file',
                         type=str,
@@ -25,7 +33,7 @@ def prepare_args():
     parser.add_argument('--model_name', type=str, default='SimpleNet')
     parser.add_argument('--lr', type=float, default=3e-4)
     parser.add_argument('--wd', type=float, default=0)
-    parser.add_argument('--num_epochs', type=int, default=100)
+    parser.add_argument('--num_epochs', type=int, default=1000)
     parser.add_argument('--shuffle', action='store_true')
     args_to_ret = parser.parse_args()
     return args_to_ret
@@ -33,6 +41,7 @@ def prepare_args():
 
 @torch.no_grad()
 def validate(args, model, loss_func, validate_loader):
+    """ Validation function"""
     model = model.to(device)
     validation_loader = validate_loader
 
@@ -49,9 +58,13 @@ def validate(args, model, loss_func, validate_loader):
 
 
 def main(args):
+    """
+    train_dataset = MelSpectrogramDataset(args.train_file, args.label_file, args.context, None, device, True)
+    test_dataset = MelSpectrogramDataset(args.test_file, None, args.context, None, device, False)
 
+    """
     dataset = MelSpectrogramDataset(args.dataset_file, args.label_file,
-                                    args.context, None, device)
+                                    args.context, None, device, None)
 
     # Split train and test datasets
     train_size = int(0.8 * len(dataset))
@@ -76,7 +89,7 @@ def main(args):
                                                      weight_decay=args.wd)
 
     loss_func = F.cross_entropy
-    
+
     training_loss = []
     # Train
     for epoch in tqdm(range(args.num_epochs)):
@@ -104,9 +117,9 @@ def main(args):
             loss_epoch.append(loss.item())
 
         print(f"Loss at epoch {epoch} is {sum(loss_epoch)/len(loss_epoch)}")
-        training_loss.append(sum(loss_epoch)/len(loss_epoch))
+        training_loss.append(sum(loss_epoch) / len(loss_epoch))
     validation_losses = validate(args, model, loss_func, validation_loader)
-    
+
     # Graph training loss
     y_loss = np.array(training_loss)
     x_epochs = np.arange(1, len(y_loss) + 1)
