@@ -51,11 +51,14 @@ def pad_with(tensor, k, dim, device):
     new_tensor = []
     for array in tensor:
         if dim == 3:
-            npad = (0, 0, k, longest_sequence - array.shape[0]) 
+            npad = (0, 0, k, longest_sequence - array.shape[0])
         if dim == 2:
             npad = (k, longest_sequence - len(array))
         torch_array = torch.tensor(array, device=device)
-        padded_array = torch.nn.functional.pad(torch_array, npad, mode='constant', value=0)
+        padded_array = torch.nn.functional.pad(torch_array,
+                                               npad,
+                                               mode='constant',
+                                               value=0)
         new_tensor.append(padded_array)
     new_tensor = torch.nn.utils.rnn.pad_sequence(new_tensor)
     return new_tensor.transpose(0, 1)
