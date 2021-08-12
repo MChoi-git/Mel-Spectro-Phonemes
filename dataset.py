@@ -22,15 +22,17 @@ def main():
     start_time = time.time()
     dataset = MelSpectrogramDataset("data/dev.npy", "data/dev_labels.npy", 1,
                                     None, device)
+
     # Running quick tests, to be replaced by pytest later
     # Check shapes and device
     print(dataset.spectrograms_array.shape)
     print(dataset.label_array.shape)
     print(dataset.spectrograms_array.device)
+
     # Test the __get_item__ function
-    x = dataset.__get_item__([0])
-    print(x['spectrogram window'][0][1])
-    print(x['spectrogram window'][0][1].shape)
+    utterance, utterance_labels = dataset.__get_item__([0])
+    print(utterance)
+    print(utterance_labels)
     print("---%s seconds ---" % (time.time() - start_time))
 
 
@@ -46,6 +48,7 @@ def pad_with(tensor, k, dim, device):
     for array in tensor:
         if max_length < array.shape[0]:
             max_length = array.shape[0]
+
     # Pad every array with 0
     longest_sequence = max_length + k
     new_tensor = []
@@ -88,15 +91,16 @@ class MelSpectrogramDataset(torch.utils.data.Dataset):
                                    allow_pickle=True)  # Load from npy file
         self.label_array = pad_with(self.label_array, self.hyperp_K, 2,
                                     self.device)  # Pad with zeros
+        self.vector_length = len(self.label_array[0])
 
         self.transform = transform
 
     def __len__(self):
         """Returns the length of the dataset
         """
-        return len(torch.flatten(self.label_array))
+        return len(self.label_array)
 
-    def __get_item__(self, idx):
+    def __getitem__(self, idx):
         """Retrives sample(s) from the dataset
         Args:
             idx (int, tensor): Index of sample(s)
@@ -104,14 +108,11 @@ class MelSpectrogramDataset(torch.utils.data.Dataset):
         # Convert index tensor to a list
         if torch.is_tensor(idx):
             idx = idx.tolist()
+
         # Extract example and corresponding label
         example = self.spectrograms_array[idx]
         label = self.label_array[idx]
-        sample = {'spectrogram window': example, 'phoneme': label}
-        # Transform sample
-        if self.transform:
-            sample = self.transform(sample)
-        return sample
+        return example, label
 
 
 if __name__ == "__main__":
